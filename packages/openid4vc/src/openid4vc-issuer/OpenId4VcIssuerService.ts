@@ -16,6 +16,7 @@ import {
   TypedArrayEncoder,
   utils,
   W3cCredentialService,
+  W3cJsonLdCredentialService,
   W3cV2CredentialService,
 } from '@credo-ts/core'
 import {
@@ -76,7 +77,6 @@ import {
   credoJwtIssuerToOpenId4VcJwtIssuer,
   decodeJwtIssuer,
   encodeJwtIssuer,
-  getProofTypeFromPublicJwk,
   getPublicJwkFromDid,
   supportedResponseEncryptionContentAlgorithms,
   supportedResponseEncryptionKeyAgreementAlgorithms,
@@ -2384,8 +2384,8 @@ export class OpenId4VcIssuerService {
     format: `${ClaimFormat.JwtVc}` | `${ClaimFormat.LdpVc}`,
     options: OpenId4VciSignW3cCredentials['credentials'][number]
   ) {
-    const publicJwk = await getPublicJwkFromDid(agentContext, options.verificationMethod)
     if (format === ClaimFormat.JwtVc) {
+      const publicJwk = await getPublicJwkFromDid(agentContext, options.verificationMethod)
       return await this.w3cCredentialService.signCredential(agentContext, {
         format: ClaimFormat.JwtVc,
         credential: options.credential,
@@ -2394,7 +2394,10 @@ export class OpenId4VcIssuerService {
       })
     }
 
-    const proofType = getProofTypeFromPublicJwk(agentContext, publicJwk)
+    // Linked data suites only accept their own verification method types, so the key type alone is not enough
+    const proofType = await agentContext
+      .resolve(W3cJsonLdCredentialService)
+      .getProofTypeForSigningCredential(agentContext, { verificationMethod: options.verificationMethod })
     return await this.w3cCredentialService.signCredential(agentContext, {
       format: ClaimFormat.LdpVc,
       credential: options.credential,
